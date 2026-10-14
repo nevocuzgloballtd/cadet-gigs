@@ -157,7 +157,11 @@ function showHome(user) {
   const content = mode === 'customer'
     ? `<div class="card"><h2>What do you need?</h2><p>Posting jobs and finding cadets comes in the next steps.</p></div>
        <button class="btn" disabled>Post a job (coming soon)</button>`
-    : `<div class="card"><h2>Jobs near you</h2><p>Your cadet profile and verification come next. Then jobs will show here.</p></div>`;
+    : `<div id="panel"><div class="card"><p>Loading...</p></div></div>`;
+
+  const admin = user.is_admin
+    ? `<button id="adminBtn" class="btn alt">Review cadet applications</button>`
+    : '';
 
   const missing = !user.is_customer
     ? `<button id="addMode" data-mode="customer" class="link">Also turn on customer mode</button>`
@@ -176,6 +180,7 @@ function showHome(user) {
         <button id="tabCadet" class="tab ${mode === 'cadet' ? 'on' : ''}" ${user.is_cadet ? '' : 'disabled'}>Cadet</button>
       </div>
       ${content}
+      ${admin}
       ${missing}
     </main>`;
 
@@ -187,11 +192,16 @@ function showHome(user) {
   document.getElementById('tabCadet').onclick = () => setMode('cadet');
   document.getElementById('logout').onclick = async () => { await api('logout', {}); showAuth('login'); };
 
+  const adminBtn = document.getElementById('adminBtn');
+  if (adminBtn) adminBtn.onclick = () => showAdmin(user);
+
   const add = document.getElementById('addMode');
   if (add) add.onclick = async () => {
     const r = await api('profile', { addMode: add.dataset.mode });
     if (r.ok) start();
   };
+
+  if (mode === 'cadet') loadCadetPanel(user);
 }
 
 start();
