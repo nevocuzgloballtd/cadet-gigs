@@ -30,6 +30,7 @@ async function api(path, body) {
 
 // ---------- Start ----------
 async function start() {
+  app.innerHTML = `<main class="shell"><h1>${APP_NAME}</h1><p class="tagline">Loading...</p></main>`;
   const r = await api('me');
   if (r.status === 401) return showAuth('login');
   if (!r.ok) return showError(r.data.error);
@@ -154,9 +155,7 @@ function showHome(user) {
   const mode = getMode(user);
   const firstName = (user.full_name || '').split(' ')[0];
 
-    const content = '<div id="panel"><div class="card"><p>Loading...</p></div></div>';
-       <button class="btn" disabled>Post a job (coming soon)</button>`
-    : `<div id="panel"><div class="card"><p>Loading...</p></div></div>`;
+  const content = '<div id="panel"><div class="card"><p>Loading...</p></div></div>';
 
   const admin = user.is_admin
     ? `<button id="adminBtn" class="btn alt">Review cadet applications</button>`
@@ -200,7 +199,7 @@ function showHome(user) {
     if (r.ok) start();
   };
 
-    if (mode === 'cadet') loadCadetPanel(user); else loadCustomerPanel(user);
+  if (mode === 'cadet') loadCadetPanel(user); else loadCustomerPanel(user);
 }
 
 start();
