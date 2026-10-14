@@ -1,5 +1,5 @@
-const CACHE = 'cadet-gigs-v5';
-const FILES = ['./', './index.html', './styles.css', './app.js', './cadet.js', './admin.js', './jobs.js', './manifest.webmanifest', './icon.svg'];
+const CACHE = 'cadet-gigs-v6';
+const FILES = ['./', './index.html', './styles.css', './app.js', './cadet.js', './admin.js', './jobs.js', './applications.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)));
