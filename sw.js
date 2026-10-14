@@ -1,4 +1,4 @@
-const CACHE = 'cadet-gigs-v1';
+const CACHE = 'cadet-gigs-v3';
 const FILES = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -15,9 +15,11 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network first: always try fresh files, fall back to saved copy when offline
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
   if (event.request.method !== 'GET') return;
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
   event.respondWith(
     fetch(event.request)
       .then((response) => {
