@@ -70,7 +70,7 @@ export default async function handler(req, res) {
       if (!UUID.test(id)) return fail(res, 400, 'Bad id.');
       const rows = await sql`
         update jobs set status = 'cancelled'
-        where id = ${id} and customer_id = ${user.id} and status = 'open'
+        where id = ${id} and customer_id = ${user.id} and status in ('open', 'filled')
         returning id`;
       if (!rows.length) return fail(res, 404, 'Job not found or already closed.');
       return res.status(200).json({ ok: true });
@@ -107,7 +107,8 @@ export default async function handler(req, res) {
     if (!future[0].ok) return fail(res, 400, 'Pick today or a future date.');
 
     const count = await sql`
-      select count(*)::int as n from jobs where customer_id = ${user.id} and status = 'open'`;
+      select count(*)::int as n from jobs
+      where customer_id = ${user.id} and status in ('open', 'filled')`;
     if (count[0].n >= 20) return fail(res, 429, 'You have too many open jobs. Cancel one first.');
 
     await sql`
