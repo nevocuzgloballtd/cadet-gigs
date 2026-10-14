@@ -40,14 +40,14 @@ async function loadCadetPanel(user) {
     return;
   }
 
-  if (p.status === 'approved') {
+    if (p.status === 'approved') {
     panel.innerHTML = `
       <div class="card"><h2>Verified cadet <span class="pill good">approved</span></h2>
         <p>${esc(p.organisation)}, ${esc(p.unit)}</p>
         <p>Skills: ${esc((p.skills || []).join(', '))}</p>
         <p>Rate: ₦${Number(p.daily_rate).toLocaleString()} per day</p></div>
-      <div class="card" style="margin-top:1rem"><h2>Jobs near you</h2>
-        <p>Jobs will show here once customers start posting them.</p></div>`;
+      <div id="cadetActions" style="margin-top:1rem"></div>`;
+    loadCadetActions(user);
     return;
   }
 
