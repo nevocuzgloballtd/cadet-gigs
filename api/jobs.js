@@ -51,7 +51,7 @@ export default async function handler(req, res) {
                j.people_needed, j.pay_per_person, j.skills, j.description,
                split_part(u.full_name, ' ', 1) as customer_name
         from jobs j join users u on u.id = j.customer_id
-        where j.status = 'open'
+        where j.status = 'open' and j.customer_id <> ${user.id}
           and j.event_date >= (now() at time zone 'Africa/Lagos')::date
           and (${area}::text = '' or j.area ilike '%' || ${area}::text || '%')
           and (${skill}::text = '' or j.skills @> to_jsonb(array[${skill}::text]))
