@@ -1,0 +1,13 @@
+{
+  "name": "Cadet Gigs",
+  "short_name": "Cadet Gigs",
+  "description": "Book trained cadets for events. Verified, rated, tracked during jobs.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1F3A2B",
+  "theme_color": "#1F3A2B",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
