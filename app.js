@@ -154,8 +154,7 @@ function showHome(user) {
   const mode = getMode(user);
   const firstName = (user.full_name || '').split(' ')[0];
 
-  const content = mode === 'customer'
-    ? `<div class="card"><h2>What do you need?</h2><p>Posting jobs and finding cadets comes in the next steps.</p></div>
+    const content = '<div id="panel"><div class="card"><p>Loading...</p></div></div>';
        <button class="btn" disabled>Post a job (coming soon)</button>`
     : `<div id="panel"><div class="card"><p>Loading...</p></div></div>`;
 
@@ -201,7 +200,7 @@ function showHome(user) {
     if (r.ok) start();
   };
 
-  if (mode === 'cadet') loadCadetPanel(user);
+    if (mode === 'cadet') loadCadetPanel(user); else loadCustomerPanel(user);
 }
 
 start();
