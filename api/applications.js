@@ -122,7 +122,7 @@ export default async function handler(req, res) {
       if (!UUID.test(id)) return fail(res, 400, 'Bad id.');
       const rows = await sql`
         update applications set status = 'withdrawn'
-        where id = ${id} and cadet_id = ${user.id} and status in ('applied', 'selected')
+        where id = ${id} and cadet_id = ${user.id} and status in ('applied', 'selected')           and (status = 'applied' or job_id in (select id from jobs where status in ('open', 'filled')))
         returning job_id`;
       if (!rows.length) return fail(res, 404, 'Application not found.');
       await refreshJobStatus(rows[0].job_id);
