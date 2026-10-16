@@ -1,11 +1,11 @@
 import adminbookings from '../server/adminbookings.js';
 import adminjobday from '../server/adminjobday.js';
+import completion from '../server/completion.js';
 import jobday from '../server/jobday.js';
 import logout from '../server/logout.js';
 
 // Every endpoint kept in the server folder is listed here.
-// When we add a new one later, we add one import line and one entry below.
-const handlers = { adminbookings, adminjobday, jobday, logout };
+const handlers = { adminbookings, adminjobday, completion, jobday, logout };
 
 export default async function handler(req, res) {
   const name = String(req.query.name || '');
