@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { sql, getUser, fail } from '../lib/db.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UNLOCKED = ['paid', 'in_progress', 'completed', 'disputed'];
 
 export default async function handler(req, res) {
   try {
@@ -15,7 +16,7 @@ export default async function handler(req, res) {
         const jobId = String(req.query.job);
         if (!UUID.test(jobId)) return fail(res, 400, 'Bad id.');
         const found = await sql`
-          select b.id, b.status, b.people_count, b.pay_per_person, b.subtotal,
+          select b.id, b.status, b.people_count, b.pay_per_person, b.subtotal, b.venue_address,
                  j.title, j.event_type, j.area,
                  to_char(j.event_date, 'YYYY-MM-DD') as event_date,
                  to_char(j.start_time, 'HH24:MI') as start_time,
@@ -23,25 +24,36 @@ export default async function handler(req, res) {
           from bookings b join jobs j on j.id = b.job_id
           where b.job_id = ${jobId} and b.customer_id = ${user.id}`;
         if (!found.length) return fail(res, 404, 'Booking not found.');
-        const cadets = await sql`
-          select split_part(u.full_name, ' ', 1) as first_name, c.organisation, c.unit
+        const booking = found[0];
+        const unlocked = UNLOCKED.includes(booking.status);
+
+        const rows = await sql`
+          select split_part(u.full_name, ' ', 1) as first_name, u.phone, c.organisation, c.unit
           from booking_participants p
           join users u on u.id = p.cadet_id
           join cadet_profiles c on c.user_id = p.cadet_id
-          where p.booking_id = ${found[0].id} and p.status = 'booked'
+          where p.booking_id = ${booking.id} and p.status = 'booked'
           order by u.full_name`;
-        return res.status(200).json({ booking: found[0], cadets });
+        const cadets = rows.map((r) => ({
+          first_name: r.first_name,
+          organisation: r.organisation,
+          unit: r.unit,
+          phone: unlocked ? r.phone : null
+        }));
+        if (!unlocked) booking.venue_address = null;
+        return res.status(200).json({ booking, cadets, unlocked });
       }
 
       // Cadet: my bookings
       if (req.query.mine) {
-        const items = await sql`
-          select p.gross, p.fee, p.payable, b.status, b.commission_percent,
+        const rows = await sql`
+          select p.gross, p.fee, p.payable, b.status, b.commission_percent, b.venue_address,
                  j.title, j.event_type, j.area,
                  to_char(j.event_date, 'YYYY-MM-DD') as event_date,
                  to_char(j.start_time, 'HH24:MI') as start_time,
                  to_char(j.end_time, 'HH24:MI') as end_time,
-                 split_part(cu.full_name, ' ', 1) as customer_name
+                 split_part(cu.full_name, ' ', 1) as customer_name,
+                 cu.full_name as customer_full_name, cu.phone as customer_phone
           from booking_participants p
           join bookings b on b.id = p.booking_id
           join jobs j on j.id = b.job_id
@@ -49,6 +61,20 @@ export default async function handler(req, res) {
           where p.cadet_id = ${user.id} and p.status = 'booked'
           order by j.event_date desc
           limit 50`;
+        const items = rows.map((r) => {
+          const unlocked = UNLOCKED.includes(r.status);
+          return {
+            gross: r.gross, fee: r.fee, payable: r.payable,
+            status: r.status, commission_percent: r.commission_percent,
+            title: r.title, event_type: r.event_type, area: r.area,
+            event_date: r.event_date, start_time: r.start_time, end_time: r.end_time,
+            customer_name: r.customer_name,
+            unlocked,
+            venue_address: unlocked ? r.venue_address : null,
+            customer_full_name: unlocked ? r.customer_full_name : null,
+            customer_phone: unlocked ? r.customer_phone : null
+          };
+        });
         return res.status(200).json({ items });
       }
 
@@ -57,6 +83,22 @@ export default async function handler(req, res) {
 
     if (req.method !== 'POST') return fail(res, 405, 'Use GET or POST');
     const b = req.body || {};
+
+    // Customer adds the venue address, only after payment
+    if (b.action === 'venue') {
+      const jobId = String(b.jobId || '');
+      if (!UUID.test(jobId)) return fail(res, 400, 'Bad id.');
+      const address = String(b.address || '').trim();
+      if (address.length < 5 || address.length > 200) {
+        return fail(res, 400, 'Enter the full venue address (5 to 200 characters).');
+      }
+      const rows = await sql`
+        update bookings set venue_address = ${address}
+        where job_id = ${jobId} and customer_id = ${user.id} and status = 'paid'
+        returning id`;
+      if (!rows.length) return fail(res, 409, 'You can add the venue only after payment is confirmed.');
+      return res.status(200).json({ ok: true });
+    }
 
     if (b.action === 'create') {
       const jobId = String(b.jobId || '');
