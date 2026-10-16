@@ -1,4 +1,4 @@
-const CACHE = 'cadet-gigs-v7';
+const CACHE = 'cadet-gigs-v8';
 const FILES = ['./', './index.html', './styles.css', './app.js', './cadet.js', './admin.js', './jobs.js', './applications.js', './bookings.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (event) => {
