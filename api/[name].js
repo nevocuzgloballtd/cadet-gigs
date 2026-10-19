@@ -4,11 +4,12 @@ import completion from '../server/completion.js';
 import cron from '../server/cron.js';
 import jobday from '../server/jobday.js';
 import logout from '../server/logout.js';
+import passwordreset from '../server/passwordreset.js';
 import ratings from '../server/ratings.js';
 import requests from '../server/requests.js';
 
 // Every endpoint kept in the server folder is listed here.
-const handlers = { adminbookings, adminjobday, completion, cron, jobday, logout, ratings, requests };
+const handlers = { adminbookings, adminjobday, completion, cron, jobday, logout, passwordreset, ratings, requests };
 
 export default async function handler(req, res) {
   const name = String(req.query.name || '');
