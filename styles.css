@@ -98,3 +98,4 @@ h1 { font-size: 2.6rem; line-height: 1.05; margin: 0; letter-spacing: -0.02em; c
 .card img { max-width: 100%; border-radius: 4px; }
 .card textarea { width: 100%; font-size: 1rem; padding: .7rem; border-radius: 4px; border: 2px solid transparent; background: var(--mist); color: var(--ink); font-family: inherit; }
 .btn.danger { background: #c0392b; color: #fff; }
+.codebox { font-family: ui-monospace, Consolas, monospace; font-size: 2rem; letter-spacing: .25rem; text-align: center; background: var(--mist); color: var(--ink); border-radius: 4px; padding: 1rem; user-select: all; }
