@@ -1,116 +1,173 @@
-// Loaded AFTER requests.js. Password reset: the login screen link, the reset form, and the admin tool.
+import { randomInt, createHash } from 'node:crypto';
+import { sql, getUser, hashPassword, fail } from '../lib/db.js';
+import { sendMail, mailReady } from '../lib/mail.js';
 
-// ---------- Login screen: add a "Forgot your password?" link ----------
-new MutationObserver(() => {
-  const go = document.getElementById('go');
-  const swap = document.getElementById('swap');
-  if (!go || !swap || document.getElementById('forgot')) return;
-  if (go.textContent.trim() !== 'Log in') return;
-  swap.insertAdjacentHTML('afterend', '<button id="forgot" class="link">Forgot your password?</button>');
-  document.getElementById('forgot').onclick = showForgot;
-}).observe(document.getElementById('app'), { childList: true, subtree: true });
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I, O, 0 or 1, so the code is easy to read
+const sha = (t) => createHash('sha256').update(t).digest('hex');
 
-// ---------- Anyone: set a new password with the admin's code ----------
-function showForgot() {
-  app.innerHTML = `<main class="shell">${header('Reset password')}
-    <p class="fine">Contact the admin by phone or WhatsApp, using the number you registered with. The admin will confirm it is you and give you a code that works once, for 30 minutes.</p>
-    <form id="resetForm" class="form">
-      <label>Email
-        <input id="rEmail" type="email" autocomplete="email" required />
-      </label>
-      <label>Code from the admin
-        <input id="rCode" type="text" autocapitalize="characters" autocomplete="off" maxlength="12" required />
-      </label>
-      <label>New password (at least 8 characters)
-        <input id="rPass" type="password" minlength="8" autocomplete="new-password" required />
-      </label>
-      <label>Type the new password again
-        <input id="rPass2" type="password" minlength="8" autocomplete="new-password" required />
-      </label>
-      <p id="msg" class="msg" role="alert"></p>
-      <button id="rGo" class="btn" type="submit">Set new password</button>
-    </form></main>`;
-  document.getElementById('back').onclick = () => showAuth('login');
-
-  document.getElementById('resetForm').onsubmit = async (e) => {
-    e.preventDefault();
-    const pass = document.getElementById('rPass').value;
-    if (pass !== document.getElementById('rPass2').value) return say('The two passwords are not the same.');
-    const btn = document.getElementById('rGo');
-    btn.disabled = true;
-    say('');
-    const r = await api('passwordreset', {
-      action: 'use',
-      email: document.getElementById('rEmail').value,
-      code: document.getElementById('rCode').value,
-      password: pass
-    });
-    btn.disabled = false;
-    if (!r.ok) return say(r.data.error || 'Something went wrong.');
-    showAuth('login');
-    say('Password changed. Log in with your new password.');
-  };
+function clientIp(req) {
+  const h = String(req.headers['x-forwarded-for'] || '');
+  return h.split(',')[0].trim().slice(0, 64) || 'unknown';
 }
 
-// ---------- Admin: create a reset code ----------
-function showAdminReset(user) {
-  app.innerHTML = `<main class="shell">${header('Password resets')}
-    <p class="fine">Before you create a code, call the person on the phone number registered on their account (cadets also have a guarantor number) and confirm it is really them. Never send a code to a different number. Each code works once and expires in 30 minutes.</p>
-    <form id="findForm" class="form">
-      <label>Search by name, email or phone
-        <input id="q" type="text" minlength="2" required />
-      </label>
-      <button class="btn" type="submit">Search</button>
-    </form>
-    <div id="results" class="stack"></div></main>`;
-  document.getElementById('back').onclick = () => showHome(user);
-  const box = document.getElementById('results');
+function newCode() {
+  let c = '';
+  for (let i = 0; i < 8; i++) c += ALPHABET[randomInt(ALPHABET.length)];
+  return c;
+}
 
-  document.getElementById('findForm').onsubmit = async (e) => {
-    e.preventDefault();
-    box.innerHTML = '<p class="fine">Searching...</p>';
-    const r = await api('passwordreset?search=' + encodeURIComponent(document.getElementById('q').value));
-    if (!r.ok) { box.innerHTML = `<p class="msg">${esc(r.data.error || 'Could not search.')}</p>`; return; }
-    box.innerHTML = r.data.users.length
-      ? r.data.users.map((u) => `
-          <div class="card stack" data-id="${esc(u.id)}">
-            <h2>${esc(u.full_name || 'No name yet')}</h2>
-            <p>${esc(u.email)}</p>
-            <p>Phone: ${u.phone ? phoneLink(u.phone) : 'not set'}</p>
-            ${u.guarantor_phone ? `<p class="fine">Guarantor: ${esc(u.guarantor_name)}, ${phoneLink(u.guarantor_phone)}</p>` : ''}
-            <p class="msg"></p>
-            <div class="codearea"></div>
-            <button class="btn" data-act="create">Create reset code</button>
-          </div>`).join('')
-      : '<p class="fine">Nobody found.</p>';
-  };
+export default async function handler(req, res) {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
 
-  box.onclick = async (e) => {
-    const btn = e.target.closest('button[data-act="create"]');
-    if (!btn) return;
-    const card = btn.closest('.card');
-    if (!confirm('Have you confirmed by phone that this is really the account owner?')) return;
-    btn.disabled = true;
-    const r = await api('passwordreset', { action: 'create', userId: card.dataset.id });
-    if (!r.ok) {
-      btn.disabled = false;
-      card.querySelector('.msg').textContent = r.data.error || 'Something went wrong.';
-      return;
+    // ---- Anyone (not logged in): ask for a code by email ----
+    if (req.method === 'POST' && req.body?.action === 'request') {
+      const email = String(req.body.email || '').trim().toLowerCase().slice(0, 200);
+      const ip = clientIp(req);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(res, 400, 'Enter a valid email.');
+      if (!mailReady()) return fail(res, 503, 'Email reset is not switched on yet. Please contact the admin.');
+
+      const recent = await sql`
+        select (count(*) filter (where email = ${email}))::int as by_email,
+               (count(*) filter (where ip = ${ip}))::int as by_ip
+        from login_attempts
+        where kind = 'resetreq' and created_at > now() - interval '1 hour'`;
+      if (recent[0].by_email >= 3 || recent[0].by_ip >= 10) {
+        return fail(res, 429, 'Too many requests. Try again in an hour.');
+      }
+      await sql`insert into login_attempts (email, ip, kind) values (${email}, ${ip}, 'resetreq')`;
+
+      // The answer is the same whether or not the email has an account
+      const users = await sql`select id from users where email = ${email}`;
+      if (users.length) {
+        const code = newCode();
+        await sql`update password_resets set used_at = now() where user_id = ${users[0].id} and used_at is null`;
+        const ins = await sql`
+          insert into password_resets (user_id, code_hash, expires_at)
+          values (${users[0].id}, ${sha(code)}, now() + interval '30 minutes')
+          returning id`;
+        try {
+          await sendMail({
+            to: email,
+            subject: 'Your Cadet Gigs password reset code',
+            text:
+`Hello,
+
+Someone (hopefully you) asked to reset the password for your Cadet Gigs account.
+
+Your code is: ${code}
+
+It works once and expires in 30 minutes. Open the app, tap "Forgot your password?", and enter this code with a new password.
+
+If you did not ask for this, ignore this email. Your password has not changed. Never share this code with anyone.`
+          });
+        } catch (err) {
+          console.error('Reset email failed', err);
+          await sql`update password_resets set used_at = now() where id = ${ins[0].id}`;
+        }
+      }
+      return res.status(200).json({ ok: true });
     }
-    card.querySelector('.codearea').innerHTML = `
-      <div class="codebox">${esc(r.data.code)}</div>
-      <p class="fine">Valid for ${esc(r.data.minutes)} minutes, one use. Tell the person this code by phone. It will not show again.</p>`;
-    btn.remove();
-  };
-}
 
-const _loadCustomerPanelPR = loadCustomerPanel;
-loadCustomerPanel = function (user) {
-  _loadCustomerPanelPR(user);
-  if (!user.is_admin) return;
-  const panel = document.getElementById('panel');
-  if (!panel) return;
-  panel.insertAdjacentHTML('beforeend',
-    '<div class="stack" style="margin-top:.6rem"><button id="adminReset" class="btn alt">Admin: password resets</button></div>');
-  document.getElementById('adminReset').onclick = () => showAdminReset(user);
-};
+    // ---- Anyone (not logged in): use a code to set a new password ----
+    if (req.method === 'POST' && req.body?.action === 'use') {
+      const b = req.body;
+      const email = String(b.email || '').trim().toLowerCase().slice(0, 200);
+      const code = String(b.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+      const password = String(b.password || '');
+      const ip = clientIp(req);
+
+      if (password.length < 8) return fail(res, 400, 'Password must be at least 8 characters.');
+      if (password.length > 200) return fail(res, 400, 'That password is too long.');
+
+      const recent = await sql`
+        select count(*)::int as n from login_attempts
+        where kind = 'reset' and ip = ${ip} and created_at > now() - interval '1 hour'`;
+      if (recent[0].n >= 10) return fail(res, 429, 'Too many wrong codes from this connection. Try again later.');
+
+      const bad = async () => {
+        await sql`insert into login_attempts (email, ip, kind) values (${email}, ${ip}, 'reset')`;
+        return fail(res, 400, 'That code is not valid or has expired. Ask for a new one.');
+      };
+
+      if (code.length !== 8) return bad();
+      const users = await sql`select id from users where email = ${email}`;
+      if (!users.length) return bad();
+      const userId = users[0].id;
+
+      const active = await sql`
+        select id from password_resets
+        where user_id = ${userId} and used_at is null and expires_at > now()
+        order by created_at desc limit 1`;
+      if (!active.length) return bad();
+
+      const newHash = await hashPassword(password);
+      const done = await sql`
+        with m as (
+          update password_resets set used_at = now()
+          where id = ${active[0].id} and code_hash = ${sha(code)}
+            and used_at is null and expires_at > now()
+          returning user_id
+        )
+        update users set password_hash = ${newHash}
+        where id in (select user_id from m)
+        returning id`;
+
+      if (!done.length) {
+        // Wrong code: after 5 wrong guesses this code is dead
+        await sql`
+          update password_resets
+          set attempts = attempts + 1,
+              used_at = case when attempts + 1 >= 5 then now() else null end
+          where id = ${active[0].id} and used_at is null`;
+        return bad();
+      }
+
+      await sql`delete from sessions where user_id = ${userId}`;
+      await sql`delete from login_attempts where kind = 'login' and email = ${email}`;
+      return res.status(200).json({ ok: true });
+    }
+
+    // ---- Everything else is for the admin only ----
+    const user = await getUser(req);
+    if (!user) return fail(res, 401, 'Not logged in');
+    if (!user.is_admin) return fail(res, 403, 'Admins only.');
+
+    if (req.method === 'GET') {
+      const q = String(req.query.search || '').trim().slice(0, 60).replace(/[%_\\]/g, '');
+      if (q.length < 2) return res.status(200).json({ users: [] });
+      const like = '%' + q + '%';
+      const users = await sql`
+        select u.id, u.email, u.full_name, u.phone, u.area, u.is_cadet, u.is_customer,
+               c.guarantor_name, c.guarantor_phone
+        from users u
+        left join cadet_profiles c on c.user_id = u.id
+        where u.email ilike ${like} or u.full_name ilike ${like} or u.phone ilike ${like}
+        order by u.created_at desc
+        limit 10`;
+      return res.status(200).json({ users });
+    }
+
+    if (req.method !== 'POST') return fail(res, 405, 'Use GET or POST');
+
+    if (req.body?.action === 'create') {
+      const userId = String(req.body.userId || '');
+      if (!UUID.test(userId)) return fail(res, 400, 'Bad id.');
+      const exists = await sql`select 1 from users where id = ${userId}`;
+      if (!exists.length) return fail(res, 404, 'User not found.');
+
+      await sql`update password_resets set used_at = now() where user_id = ${userId} and used_at is null`;
+      const code = newCode();
+      await sql`
+        insert into password_resets (user_id, code_hash, expires_at, created_by)
+        values (${userId}, ${sha(code)}, now() + interval '30 minutes', ${user.id})`;
+      return res.status(200).json({ code, minutes: 30 });
+    }
+
+    return fail(res, 400, 'Unknown action.');
+  } catch (err) {
+    console.error(err);
+    return fail(res, 500, 'Something went wrong. Try again.');
+  }
+}
