@@ -23,11 +23,16 @@ export default async function handler(req, res) {
       return fail(res, 429, 'Too many wrong tries. Wait 15 minutes and try again.');
     }
 
-    const rows = await sql`select id, password_hash from users where email = ${email}`;
+    const rows = await sql`select id, password_hash, suspended_at from users where email = ${email}`;
     const ok = rows.length && (await checkPassword(password, rows[0].password_hash));
     if (!ok) {
       await sql`insert into login_attempts (email, ip, kind) values (${email}, ${ip}, 'login')`;
       return fail(res, 401, 'Wrong email or password.');
+    }
+
+    // Only someone who knows the password is told that the account is suspended
+    if (rows[0].suspended_at) {
+      return fail(res, 403, 'Your account is suspended. Please contact the admin.');
     }
 
     await sql`delete from login_attempts where kind = 'login' and email = ${email}`;
