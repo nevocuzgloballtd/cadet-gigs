@@ -1,4 +1,5 @@
 import { sql, getUser, fail } from '../lib/db.js';
+import { sendMail, mailReady } from '../lib/mail.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -110,8 +111,10 @@ export default async function handler(req, res) {
     // ---- SOS ----
     if (action === 'sos') {
       const found = await sql`
-        select b.status from booking_participants p
+        select b.status, j.title, j.area
+        from booking_participants p
         join bookings b on b.id = p.booking_id
+        join jobs j on j.id = b.job_id
         where p.booking_id = ${id} and p.cadet_id = ${user.id} and p.status = 'booked'`;
       if (!found.length) return fail(res, 404, 'Booking not found.');
       if (!['paid', 'in_progress'].includes(found[0].status)) return fail(res, 409, 'SOS works during a paid job.');
@@ -121,6 +124,28 @@ export default async function handler(req, res) {
       if (!open.length) {
         await sql`insert into sos_alerts (booking_id, cadet_id, lat, lng)
                   values (${id}, ${user.id}, ${c ? c.lat : null}, ${c ? c.lng : null})`;
+
+        // Best effort: email every admin. If this fails, the alert is still saved and shown in the app.
+        if (mailReady()) {
+          try {
+            const admins = await sql`
+              select email from users where is_admin and deleted_at is null and suspended_at is null`;
+            const where = c ? `https://www.google.com/maps?q=${c.lat},${c.lng}` : 'Location was not available.';
+            const text =
+`SOS from a Cadet Gigs cadet.
+
+Name: ${user.full_name}
+Phone: ${user.phone}
+Job: ${found[0].title} in ${found[0].area}
+Last location: ${where}
+
+Call the cadet now. Then open the app: Admin tools, then SOS and live jobs.`;
+            await Promise.allSettled(admins.map((a) =>
+              sendMail({ to: a.email, subject: 'SOS alert: ' + user.full_name, text })));
+          } catch (err) {
+            console.error('SOS email failed', err);
+          }
+        }
       }
       return res.status(200).json({ ok: true });
     }
