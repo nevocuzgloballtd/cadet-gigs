@@ -5,6 +5,7 @@ import adminusers from '../server/adminusers.js';
 import cancellations from '../server/cancellations.js';
 import completion from '../server/completion.js';
 import cron from '../server/cron.js';
+import dashboard from '../server/dashboard.js';
 import jobday from '../server/jobday.js';
 import logout from '../server/logout.js';
 import notifications from '../server/notifications.js';
@@ -14,7 +15,7 @@ import requests from '../server/requests.js';
 import terms from '../server/terms.js';
 
 // Every endpoint kept in the server folder is listed here.
-const handlers = { account, adminbookings, adminjobday, adminusers, cancellations, completion, cron, jobday, logout, notifications, passwordreset, ratings, requests, terms };
+const handlers = { account, adminbookings, adminjobday, adminusers, cancellations, completion, cron, dashboard, jobday, logout, notifications, passwordreset, ratings, requests, terms };
 
 export default async function handler(req, res) {
   const name = String(req.query.name || '');
