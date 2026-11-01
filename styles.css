@@ -290,3 +290,9 @@ body.has-nav .shell { justify-content: flex-start; padding-top: calc(5.4rem + en
   .dash--customer { grid-template-columns: minmax(0, 1fr) 21rem; grid-template-areas: "greet greet" "stats stats" "banner banner" "tiles upcoming"; }
   .dash--lite { display: flex; max-width: 40rem; }
 }
+.navlink, .brand-tag { white-space: nowrap; }
+@media (max-width: 1250px) and (min-width: 900px) {
+  .brand-tag { display: none; }
+  .navlink { padding: .5rem .55rem; font-size: .88rem; }
+  .navlink svg { display: none; }
+}
