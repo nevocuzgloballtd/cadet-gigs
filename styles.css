@@ -130,3 +130,41 @@ input[type="file"] { font-size: .95rem; color: var(--muted); }
 
 /* ---------- Respect people who want less motion ---------- */
 @media (prefers-reduced-motion: reduce) { .btn:active { transform: none; } }
+/* ---------- Stage B: tidy home screen ---------- */
+.stack:has(> #findJobs), .stack:has(> #postJob) {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .6rem;
+}
+.stack:has(> #findJobs) > .btn, .stack:has(> #postJob) > .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 4.2rem;
+  padding: .7rem .6rem;
+  font-size: .95rem;
+  line-height: 1.25;
+}
+
+/* Cadet home */
+#findJobs { grid-column: 1 / -1; order: -2; }
+#jobDay { grid-column: 1 / -1; order: -1; background: transparent; color: var(--brass); border: 1.5px solid var(--brass); }
+#myApps { order: 1; }
+#jobRequests { order: 2; }
+#myBookings { order: 3; }
+#postAvail { order: 4; }
+#myAvail { order: 5; }
+
+/* Customer home */
+#postJob { grid-column: 1 / -1; order: -1; }
+#findCadets { order: 1; }
+#sentReqs { order: 2; }
+#myJobs { grid-column: 1 / -1; order: 3; }
+
+/* Admin */
+#adminBtn { display: none; }
+#adminHub { background: transparent; color: var(--khaki); border: 1.5px solid var(--line-strong); }
+
+/* My account and Notifications on one line */
+.linkrow { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: center; }
+.linkrow .link { padding: .25rem 0 !important; font-size: .95rem; }
