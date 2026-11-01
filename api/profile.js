@@ -1,6 +1,5 @@
 import { sql, getUser, fail } from '../lib/db.js';
-
-const CONSENT_VERSION = 'v1-draft';
+import { TERMS_VERSION } from '../lib/legal.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return fail(res, 405, 'Use POST');
@@ -38,7 +37,8 @@ export default async function handler(req, res) {
         full_name = ${fullName}, phone = ${phone}, area = ${area},
         is_customer = ${isCustomer}, is_cadet = ${isCadet},
         consented_at = coalesce(consented_at, now()),
-        consent_version = ${CONSENT_VERSION}
+        consent_version = ${TERMS_VERSION},
+        terms_accepted_at = now()
       where id = ${user.id}`;
     return res.status(200).json({ ok: true });
   } catch (err) {
