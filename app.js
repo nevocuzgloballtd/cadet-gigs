@@ -142,7 +142,7 @@ function showOnboarding() {
   };
 }
 
-// ---------- Screen 3: Home with Customer / Cadet mode ----------
+// ---------- Home: the dashboard is built in dashboard.js ----------
 function getMode(user) {
   let saved = null;
   try { saved = localStorage.getItem('mode'); } catch (e) {}
@@ -152,54 +152,7 @@ function getMode(user) {
 }
 
 function showHome(user) {
-  const mode = getMode(user);
-  const firstName = (user.full_name || '').split(' ')[0];
-
-  const content = '<div id="panel"><div class="card"><p>Loading...</p></div></div>';
-
-  const admin = user.is_admin
-    ? `<button id="adminBtn" class="btn alt">Review cadet applications</button>`
-    : '';
-
-  const missing = !user.is_customer
-    ? `<button id="addMode" data-mode="customer" class="link">Also turn on customer mode</button>`
-    : !user.is_cadet
-    ? `<button id="addMode" data-mode="cadet" class="link">Also turn on cadet mode</button>`
-    : '';
-
-  app.innerHTML = `
-    <main class="shell">
-      <div class="top">
-        <h1 style="font-size:1.9rem">Hello, ${esc(firstName)}</h1>
-        <button id="logout" class="link">Log out</button>
-      </div>
-      <div class="tabs">
-        <button id="tabCustomer" class="tab ${mode === 'customer' ? 'on' : ''}" ${user.is_customer ? '' : 'disabled'}>Customer</button>
-        <button id="tabCadet" class="tab ${mode === 'cadet' ? 'on' : ''}" ${user.is_cadet ? '' : 'disabled'}>Cadet</button>
-      </div>
-      ${content}
-      ${admin}
-      ${missing}
-    </main>`;
-
-  const setMode = (m) => {
-    try { localStorage.setItem('mode', m); } catch (e) {}
-    showHome(user);
-  };
-  document.getElementById('tabCustomer').onclick = () => setMode('customer');
-  document.getElementById('tabCadet').onclick = () => setMode('cadet');
-  document.getElementById('logout').onclick = async () => { await api('logout', {}); showAuth('login'); };
-
-  const adminBtn = document.getElementById('adminBtn');
-  if (adminBtn) adminBtn.onclick = () => showAdmin(user);
-
-  const add = document.getElementById('addMode');
-  if (add) add.onclick = async () => {
-    const r = await api('profile', { addMode: add.dataset.mode });
-    if (r.ok) start();
-  };
-
-  if (mode === 'cadet') loadCadetPanel(user); else loadCustomerPanel(user);
+  renderDashboard(user);
 }
 
 start();
