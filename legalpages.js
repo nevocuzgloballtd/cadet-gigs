@@ -3,9 +3,9 @@
 
 const LEGAL = {
   draft: true, // change to false only after a lawyer has reviewed everything
-  company: '[YOUR COMPANY NAME]',
-  address: '[YOUR BUSINESS ADDRESS]',
-  email: '[YOUR CONTACT EMAIL]',
+  company: '[NEVOCUZ]',
+  address: '[NO.3 ANUOLUWAPO STR]',
+  email: '[nevocuzgloballtd@gmail.com]',
   updated: 'October 2026'
 };
 
